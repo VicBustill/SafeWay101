@@ -6,7 +6,7 @@
     "postCreateCommand": "pip install -r requirements.txt",
 
     // Runs Streamlit automatically every time I start my gitHub workspace
-    "postStartCommand": "streamlit run safeWay101_app.py --server.address 0.0.0.0",
+    "postStartCommand": "streamlit run safeWay101_app.py",
 
     "customizations": {
         "vscode": {
