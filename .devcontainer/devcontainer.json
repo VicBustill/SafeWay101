@@ -6,7 +6,7 @@
     "postCreateCommand": "pip install -r requirements.txt",
 
     // Runs Streamlit automatically every time I start my gitHub workspace
-    "postStartCommand": "streamlit run safeWay101_app.py",
+    "postStartCommand": "streamlit run safeWay101_app.py --server.address 0.0.0.0",
 
     "customizations": {
         "vscode": {
@@ -15,14 +15,7 @@
                 "ms-python.vscode-pylance"
             ]
         }
-    },
-
-    // Automatically opens the browser tab
-    "forwardPorts": [8501],
-    "portsAttributes": {
-        "8501": {
-            "label": "Streamlit Dashboard",
-            "onAutoForward": "openBrowser"
-        }
     }
+
+    
 }
