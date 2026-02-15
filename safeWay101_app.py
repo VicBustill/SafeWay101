@@ -1,38 +1,23 @@
 import streamlit as st
-import folium
-from streamlit_folium import st_folium
+import streamlit.components.v1 as components
+import os
 
-# 1. Page Configuration
+
+
+api_key = "Blank"
+
+# ----------------------Here starts my section for Maps Embed API------------------------------------
+st.sidebar.title("SafeWay101 Controls")
+address = st.sidebar.text_input("Enter a location", "Los Angeles, CA")
+
+# There is my Embbedded URL for [Maps Embed API]
+map_url = f"https://www.google.com/maps/embed/v1/place?key={api_key}&q={address}"
+
+# Here I will configure aspects of my map sizes and the actual display
+st.title("SafeWay101 Map")
 st.set_page_config(layout="wide")
-
-# 2. Sidebar UI
-with st.sidebar:
-    st.title("Place Holder for Filters")
-    st.subheader("Filter 1 Controls")
-    
-    # Example inputs
-    map_style = st.selectbox(
-        "Choose filter Style",
-        ["OpenStreetMap", "filter2", "filter3"]
-    )
-    
-    show_markers = st.checkbox("Show Points of Interest", value=True)
-    
-    st.info("Adjust the settings above to update the map on the right.")
-
-# 3. Main Area (The Map)
-st.title("SafeWay101 Dashboard")
-
-# Create a placeholder or logic for your map
-m = folium.Map(location=[34.0522, -118.2437], zoom_start=10, tiles=map_style)
-
-# Add a marker if the checkbox is checked
-if show_markers:
-    folium.Marker(
-        [34.0522, -118.2437], 
-        popup="Los Angeles", 
-        tooltip="Click for info"
-    ).add_to(m)
-
-# Render the map in the main area
-st_folium(m, width=1200, height=600)
+components.html(
+    f'<iframe width="100%" height="800" frameborder="0" style="border:0" src="{map_url}" allowfullscreen></iframe>',
+    height=800,
+)
+# ----------------------Here ends my section for Maps Embed API------------------------------------
