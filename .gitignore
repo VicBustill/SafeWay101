@@ -1,1 +1,21 @@
+#My current ignored values
+#1. Environment variables
 .env
+
+#2. Python bytecode
+__pycache__/
+*.py[cod]
+
+#3. Virtual environments
+venv/
+.env/
+.venv/
+
+#4. Streamlit
+.streamlit/
+
+#5. macOS
+.DS_Store
+
+#6. Windows
+Thumbs.db
