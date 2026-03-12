@@ -3,6 +3,7 @@ from streamlit_geolocation import streamlit_geolocation
 from dotenv import load_dotenv
 import os
 from map_controller import render_map
+from places_autocomplete import get_autocomplete, get_place_details
 
 #-----A inital setup for my streamlit env and pages-----------
 load_dotenv()
@@ -11,6 +12,58 @@ api_key = os.getenv("Google_Maps_API")
 
 
 #-----Inital setup ends here-------------------------
+
+# --- Places session token ---
+if "places_session_token" not in st.session_state:
+    st.session_state.places_session_token = os.urandom(16).hex()
+
+places_token = st.session_state.places_session_token
+
+#This section will help with my autofill section of code
+def sidebar_places_input(label: str, default_value: str, key_prefix: str):
+    """
+    Returns:
+      typed_value: what user typed (store in session_state to persist)
+      final_value: best value for mapping (lat,lng if available; else formatted address)
+    """
+    typed_value = st.sidebar.text_input(label, value=default_value, key=f"{key_prefix}_typed")
+    final_value = typed_value  # fallback if no selection
+
+    predictions = []
+    if typed_value and len(typed_value) >= 3:
+        data = get_autocomplete(
+         typed_value,
+         api_key,
+         places_token,
+         location=st.session_state.get("last_location"),  # "lat,lng" or None
+         radius=50000,
+         types="geocode",
+         components="country:us",
+        )
+        predictions = data.get("predictions", [])
+
+    if predictions:
+        options = {p["description"]: p["place_id"] for p in predictions}
+        choice = st.sidebar.selectbox(
+            f"{label} suggestions",
+            ["(pick one)"] + list(options.keys()),
+            key=f"{key_prefix}_choice",
+        )
+
+        if choice != "(pick one)":
+            details = get_place_details(options[choice], api_key, places_token)
+            result = details.get("result", {})
+
+            formatted = result.get("formatted_address", choice)
+            loc = (result.get("geometry", {}).get("location") or {})
+            lat = loc.get("lat")
+            lng = loc.get("lng")
+
+            final_value = f"{lat},{lng}" if (lat is not None and lng is not None) else formatted
+
+    return typed_value, final_value
+
+
 
 # ----------------------Here starts my section for Maps Embed API----------------------------------------
 st.sidebar.title("SafeWay101 Controls")
@@ -65,22 +118,22 @@ if use_current_location:
     start_address = st.session_state.start_address
 
 else:
-    st.session_state.start_address = st.sidebar.text_input(
-        "Enter starting point",
-        value=st.session_state.start_address
+    typed_start, start_address = sidebar_places_input(
+        label="Enter starting point",
+        default_value=st.session_state.start_address,
+        key_prefix="start"
     )
-    start_address = st.session_state.start_address
+    st.session_state.start_address = typed_start
 
 # ---- Destination ----
-st.session_state.destination_address = st.sidebar.text_input(
-    "Enter destination",
-    value=st.session_state.destination_address
+typed_dest, destination_address = sidebar_places_input(
+    label="Enter destination",
+    default_value=st.session_state.destination_address,
+    key_prefix="dest"
 )
-destination_address = st.session_state.destination_address
+st.session_state.destination_address = typed_dest
 
-
-# Line below is my URL for [Maps Embed API]
-from map_controller import render_map
+st.sidebar.divider()
 
 st.title("SafeWay101 Map")
 render_map(api_key, start_address, destination_address)
