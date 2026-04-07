@@ -94,9 +94,9 @@ status_text = "🟢 On" if use_current_location else "🔴 Off"
 st.sidebar.markdown(f"**Status:** {status_text}")
 
 radius_miles = st.sidebar.slider(
-    "Radius (miles)",
+    "Radius (In miles)",
     min_value=0,
-    max_value=10,
+    max_value=3,
     value=st.session_state.radius_miles,
     step=1,
     key="radius_miles"
