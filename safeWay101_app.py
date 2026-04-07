@@ -80,6 +80,9 @@ if "start_address" not in st.session_state:
 if "destination_address" not in st.session_state:
     st.session_state.destination_address = ""
 
+if "radius_miles" not in st.session_state:
+    st.session_state.radius_miles = 0
+
 # ---- Toggle for manual or current location ----
 use_current_location = st.sidebar.toggle(
     "Use Current Location",
@@ -89,6 +92,15 @@ use_current_location = st.sidebar.toggle(
 
 status_text = "🟢 On" if use_current_location else "🔴 Off"
 st.sidebar.markdown(f"**Status:** {status_text}")
+
+radius_miles = st.sidebar.slider(
+    "Radius (miles)",
+    min_value=0,
+    max_value=10,
+    value=st.session_state.radius_miles,
+    step=1,
+    key="radius_miles"
+)
 
 # ---- Starting Point Logic ----
 if use_current_location:
@@ -136,7 +148,7 @@ st.session_state.destination_address = typed_dest
 st.sidebar.divider()
 
 st.title("SafeWay101 Map")
-render_map(api_key, start_address, destination_address)
+render_map(api_key, start_address, destination_address, radius_miles, use_current_location)
 # ----------------------Here ends my section for Maps Embed API------------------------------------
 
 

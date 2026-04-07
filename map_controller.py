@@ -1,9 +1,11 @@
 import streamlit.components.v1 as components
 
-def render_map(api_key: str, start_address: str, destination_address: str):
+def render_map(api_key: str, start_address: str, destination_address: str, radius_miles: int, use_current_location: bool):
     # Escape double quotes to avoid breaking the JS string literals
     start_js = (start_address or "").replace('"', '\\"')
     dest_js = (destination_address or "").replace('"', '\\"')
+    radius_miles_js = radius_miles
+    use_current_location_js = "true" if use_current_location else "false"
 
     html = f"""
     <!DOCTYPE html>
@@ -36,6 +38,8 @@ def render_map(api_key: str, start_address: str, destination_address: str):
           function initMap() {{
             const start = "{start_js}";
             const dest = "{dest_js}";
+            const radiusMiles = {radius_miles_js};
+            const useCurrentLocation = {use_current_location_js};
 
             const geocoder = new google.maps.Geocoder();
             const directionsService = new google.maps.DirectionsService();
@@ -72,14 +76,29 @@ def render_map(api_key: str, start_address: str, destination_address: str):
             if (start && isLatLng(start)) {{
               const startLatLng = parseLatLng(start);
               map.setCenter(startLatLng);
+              
               new google.maps.Marker({{
                 map,
                 position: startLatLng,
                 title: "Start"
               }});
-              showStartMarkerAndMaybeRoute(startLatLng);
-              return;
+
+            if (useCurrentLocation && radiusMiles > 0) {{
+              const radiusMeters = radiusMiles * 1609.34;
+
+              new google.maps.Circle({{
+               map,
+               center: startLatLng,
+               radius: radiusMeters,
+               strokeOpacity: 0.8,
+               strokeWeight: 2,
+               fillOpacity: 0.15
+              }});
             }}
+
+             showStartMarkerAndMaybeRoute(startLatLng);
+             return;
+          }}
 
             // Otherwise, geocode the start address
             if (start && start.trim().length > 0) {{
