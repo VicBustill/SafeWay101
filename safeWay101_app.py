@@ -94,8 +94,15 @@ if "radius_miles" not in st.session_state:
 if "last_location" not in st.session_state:
     st.session_state.last_location = None
 
+TRAVEL_MODE_LABELS = ["Driving", "Walking", "Transit"]
+TRAVEL_MODE_MAP = {
+    "Driving": "DRIVING",
+    "Walking": "WALKING",
+    "Transit": "TRANSIT",
+}
+
 if "travel_mode" not in st.session_state:
-    st.session_state.travel_mode = "DRIVING"
+    st.session_state.travel_mode = "Driving"
 
 # ---- Toggle for manual or current location ----
 use_current_location = st.sidebar.toggle(
@@ -116,12 +123,13 @@ radius_miles = st.sidebar.slider(
     key="radius_miles"
 )
 
-travel_mode = st.sidebar.selectbox(
+travel_mode_label = st.sidebar.selectbox(
     "Travel Mode",
-    options=["Driving", "Walking", "Transit"],
-    index=["DRIVING", "WALKING", "TRANSIT"].index(st.session_state.travel_mode),
+    options=TRAVEL_MODE_LABELS,
+    index=TRAVEL_MODE_LABELS.index(st.session_state.travel_mode),
     key="travel_mode",
 )
+travel_mode = TRAVEL_MODE_MAP[travel_mode_label]
 
 # ---- Starting Point Logic ----
 if use_current_location:
@@ -196,7 +204,7 @@ st.session_state.destination_address = typed_dest
 st.sidebar.divider()
 
 st.title("SafeWay101 Map")
-render_map(api_key, start_address, destination_address, radius_miles, use_current_location,travel_mode)
+render_map(api_key, start_address, destination_address, radius_miles, use_current_location, travel_mode)
 # ----------------------Here ends my section for Maps Embed API------------------------------------
 
 
