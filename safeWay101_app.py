@@ -19,6 +19,14 @@ if "places_session_token" not in st.session_state:
 
 places_token = st.session_state.places_session_token
 
+def is_valid_lat_lng(lat, lng):
+    return (
+        lat is not None and lng is not None
+        and isinstance(lat, (int, float))
+        and isinstance(lng, (int, float))
+        and -90 <= lat <= 90
+        and -180 <= lng <= 180
+    )
 #This section will help with my autofill section of code
 def sidebar_places_input(label: str, default_value: str, key_prefix: str):
     """
@@ -83,6 +91,12 @@ if "destination_address" not in st.session_state:
 if "radius_miles" not in st.session_state:
     st.session_state.radius_miles = 0
 
+if "last_location" not in st.session_state:
+    st.session_state.last_location = None
+
+if "travel_mode" not in st.session_state:
+    st.session_state.travel_mode = "DRIVING"
+
 # ---- Toggle for manual or current location ----
 use_current_location = st.sidebar.toggle(
     "Use Current Location",
@@ -100,6 +114,13 @@ radius_miles = st.sidebar.slider(
     value=st.session_state.radius_miles,
     step=1,
     key="radius_miles"
+)
+
+travel_mode = st.sidebar.selectbox(
+    "Travel Mode",
+    options=["Driving", "Walking", "Transit"],
+    index=["DRIVING", "WALKING", "TRANSIT"].index(st.session_state.travel_mode),
+    key="travel_mode",
 )
 
 # ---- Starting Point Logic ----
@@ -121,9 +142,36 @@ if use_current_location:
         )
         loc = streamlit_geolocation()  # asks browser for permission which is needed for below
 
-    if loc and loc.get("latitude") and loc.get("longitude"):
-        st.session_state.start_address = f"{loc['latitude']},{loc['longitude']}"
-        st.sidebar.success("Current location detected")
+    with st.sidebar.expander("Location debug"):
+        st.write(loc)
+
+    if isinstance(loc, dict):
+        lat = loc.get("latitude")
+        lng = loc.get("longitude")
+        accuracy = loc.get("accuracy")
+
+        if is_valid_lat_lng(lat, lng):
+           detected_coords = f"{lat},{lng}"
+           st.session_state.last_location = detected_coords
+
+           if accuracy is not None and accuracy <= 100:
+               st.session_state.start_address = detected_coords
+               st.sidebar.success(
+                   f"Current location detected ({accuracy:.0f} m accuracy)"
+            )
+           elif accuracy is not None and accuracy <= 500:
+               st.session_state.start_address = detected_coords
+               st.sidebar.warning(
+                   f"Current location detected, but it is coarse ({accuracy:.0f} m accuracy). "
+                   "Verify before routing."
+               )
+           else:
+               st.sidebar.warning(
+                   "Current location looks approximate on this device. "
+                   "Use manual input if the map looks wrong."
+               )
+        else:
+            st.sidebar.info("Location data received, but coordinates were invalid.")
     else:
         st.sidebar.info("Waiting for location permission...")
 
@@ -148,7 +196,7 @@ st.session_state.destination_address = typed_dest
 st.sidebar.divider()
 
 st.title("SafeWay101 Map")
-render_map(api_key, start_address, destination_address, radius_miles, use_current_location)
+render_map(api_key, start_address, destination_address, radius_miles, use_current_location,travel_mode)
 # ----------------------Here ends my section for Maps Embed API------------------------------------
 
 

@@ -1,11 +1,19 @@
 import streamlit.components.v1 as components
-
-def render_map(api_key: str, start_address: str, destination_address: str, radius_miles: int, use_current_location: bool):
+#I modded here
+def render_map(
+    api_key: str,
+    start_address: str,
+    destination_address: str,
+    radius_miles: int,
+    use_current_location: bool,
+    travel_mode: str,
+):
     # Escape double quotes to avoid breaking the JS string literals
     start_js = (start_address or "").replace('"', '\\"')
     dest_js = (destination_address or "").replace('"', '\\"')
     radius_miles_js = radius_miles
     use_current_location_js = "true" if use_current_location else "false"
+    travel_mode_js = (travel_mode or "DRIVING").replace('"', '\\"')
 
     html = f"""
     <!DOCTYPE html>
@@ -40,6 +48,7 @@ def render_map(api_key: str, start_address: str, destination_address: str, radiu
             const dest = "{dest_js}";
             const radiusMiles = {radius_miles_js};
             const useCurrentLocation = {use_current_location_js};
+            const travelMode = "{travel_mode_js}";
 
             const geocoder = new google.maps.Geocoder();
             const directionsService = new google.maps.DirectionsService();
@@ -59,7 +68,7 @@ def render_map(api_key: str, start_address: str, destination_address: str, radiu
                   {{
                     origin: originForDirections,
                     destination: dest,
-                    travelMode: google.maps.TravelMode.DRIVING
+                    travelMode: google.maps.TravelMode[travelMode]
                   }},
                   (response, status) => {{
                     if (status === "OK") {{
