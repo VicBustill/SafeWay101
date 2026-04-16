@@ -28,9 +28,17 @@ def get_autocomplete(
     if components:
         params["components"] = components
 
-    r = requests.get(AUTOCOMPLETE_URL, params=params, timeout=10)
-    r.raise_for_status()
-    return r.json()
+    try:
+        r = requests.get(AUTOCOMPLETE_URL, params=params, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+
+        if data.get("status") != "OK":
+            return {"predictions": []}
+
+        return data
+    except requests.RequestException:
+        return {"predictions": []}
 
 
 def get_place_details(place_id: str, api_key: str, session_token: str):
@@ -40,6 +48,15 @@ def get_place_details(place_id: str, api_key: str, session_token: str):
         "key": api_key,
         "sessiontoken": session_token,
     }
-    r = requests.get(DETAILS_URL, params=params, timeout=10)
-    r.raise_for_status()
-    return r.json()
+    try:
+        r = requests.get(DETAILS_URL, params=params, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+
+        if data.get("status") != "OK":
+            return {"result": {}}
+
+        return data
+
+    except requests.RequestException:
+        return {"result": {}}
