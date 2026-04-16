@@ -28,7 +28,7 @@ def is_valid_lat_lng(lat, lng):
         and -180 <= lng <= 180
     )
 #This section will help with my autofill section of code
-def sidebar_places_input(label: str, default_value: str, key_prefix: str):
+def sidebar_places_input(label: str, default_value: str, key_prefix: str, place_types: str | None = "geocode",):
     """
     Returns:
       typed_value: what user typed (store in session_state to persist)
@@ -45,7 +45,7 @@ def sidebar_places_input(label: str, default_value: str, key_prefix: str):
          places_token,
          location=st.session_state.get("last_location"),  # "lat,lng" or None
          radius=50000,
-         types="geocode",
+         types=place_types,
          components="country:us",
         )
         predictions = data.get("predictions", [])
@@ -186,10 +186,12 @@ if use_current_location:
     start_address = st.session_state.start_address
 
 else:
+
     typed_start, start_address = sidebar_places_input(
-        label="Enter starting point",
-        default_value=st.session_state.start_address,
-        key_prefix="start"
+    label="Enter starting point",
+    default_value=st.session_state.start_address,
+    key_prefix="start",
+    place_types="geocode",
     )
     st.session_state.start_address = typed_start
 
@@ -197,7 +199,8 @@ else:
 typed_dest, destination_address = sidebar_places_input(
     label="Enter destination",
     default_value=st.session_state.destination_address,
-    key_prefix="dest"
+    key_prefix="dest",
+    place_types=None,
 )
 st.session_state.destination_address = typed_dest
 
