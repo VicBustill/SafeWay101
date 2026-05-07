@@ -2,6 +2,7 @@ import requests
 
 AUTOCOMPLETE_URL = "https://maps.googleapis.com/maps/api/place/autocomplete/json"
 DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json"
+GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json"
 
 def get_autocomplete(
     query: str,
@@ -60,3 +61,35 @@ def get_place_details(place_id: str, api_key: str, session_token: str):
 
     except requests.RequestException:
         return {"result": {}}
+
+
+def geocode_address(address: str, api_key: str):
+    params = {
+        "address": address,
+        "key": api_key,
+    }
+
+    try:
+        r = requests.get(GEOCODE_URL, params=params, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+
+        if data.get("status") != "OK":
+            return None
+
+        results = data.get("results", [])
+
+        if not results:
+            return None
+
+        loc = results[0].get("geometry", {}).get("location", {})
+        lat = loc.get("lat")
+        lng = loc.get("lng")
+
+        if lat is None or lng is None:
+            return None
+
+        return lat, lng
+
+    except requests.RequestException:
+        return None

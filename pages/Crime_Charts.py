@@ -3,111 +3,126 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 st.set_page_config(layout="wide")
-st.title("Crime Type Chart")
+st.title("Crime Offense Chart")
 
-crime_data = {
-    "incidents_count": 1,
-    "pages_count": 1,
-    "incidents": [
-        {
-            "city_key": "CHI",
-            "incident_code": "13337116",
-            "incident_date": "2024-01-12T21:00:00Z",
-            "incident_offense": "Motor Vehicle Theft",
-            "incident_offense_code": "240",
-            "incident_offense_description": "Motor Vehicle Theft",
-            "incident_offense_detail_description": "Motor Vehicle Theft at 050XX N LAKE SHORE DR SB",
-            "incident_offense_crime_against": "Property",
-            "incident_offense_action": "C",
-            "incident_source_original_type": "MOTOR VEHICLE THEFT - THEFT / RECOVERY - AUTOMOBILE",
-            "incident_source_name": "Chicago_Police_Department",
-            "incident_latitude": 41.9751781,
-            "incident_longitude": -87.6499609,
-            "incident_address": "050XX N LAKE SHORE DR SB"
-        }
-    ]
-}
+crime_markers = st.session_state.get("crime_markers", [])
 
-incidents = crime_data.get("incidents", [])
-df = pd.DataFrame(incidents)
-
-if df.empty:
-    st.warning("No crime data available.")
-else:
-    chart_type = st.selectbox(
-        "Select Chart Type",
-        ["Pie Chart", "Bar Graph"]
+if not crime_markers:
+    st.warning("No LAPD crime records loaded yet.")
+    st.info(
+        "Go to the map page, choose a location and radius, "
+        "then click 'Load nearby crime records'."
     )
 
-    offense_counts = df["incident_offense"].value_counts().sort_values(ascending=True)
-    num_categories = len(offense_counts)
+else:
+    rows = []
 
-    if chart_type == "Pie Chart":
-        fig, ax = plt.subplots(figsize=(8, 8))
-        ax.pie(
-            offense_counts,
-            labels=offense_counts.index,
-            autopct="%1.1f%%",
-            startangle=90
+    for marker in crime_markers:
+        summary = marker.get("summary", {})
+
+        flags = summary.get("flags", [])
+
+        if isinstance(flags, list):
+            flags_text = ", ".join(flags)
+        else:
+            flags_text = str(flags) if flags else ""
+
+        rows.append(
+            {
+                "Case No": marker.get("case_no"),
+                "Offense": marker.get("title"),
+                "Crime Against": summary.get("crime_against"),
+                "Occurred": summary.get("occurred"),
+                "Reported": summary.get("reported"),
+                "Location": summary.get("location"),
+                "Premise": summary.get("premise"),
+                "Status": summary.get("status"),
+                "Flags": flags_text,
+                "Distance (m)": marker.get("distance_m"),
+                "Icon Category": marker.get("icon_category"),
+            }
         )
-        ax.set_title("Crime Types by Incident Offense")
-        plt.tight_layout()
 
+    df = pd.DataFrame(rows)
+
+    st.subheader("Crime Summary")
+
+    unique_cases = df["Case No"].dropna().nunique()
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Nearby Records Count", len(df))
+    col2.metric("Unique Case Count", unique_cases)
+    col3.metric("Source", "LAPD / LA City")
+
+    st.divider()
+
+    offense_counts_full = (
+        df["Offense"]
+        .fillna("Unknown")
+        .replace("", "Unknown")
+        .value_counts()
+    )
+
+    max_categories = min(50, len(offense_counts_full))
+
+    top_n = st.slider(
+        "Number of offenses to show",
+        min_value=5,
+        max_value=max(5, max_categories),
+        value=min(10, max_categories),
+        step=1,
+    )
+
+    top_counts = offense_counts_full.head(top_n)
+    other_count = offense_counts_full.iloc[top_n:].sum()
+
+    if other_count > 0:
+        offense_counts_plot = pd.concat(
+            [
+                top_counts,
+                pd.Series({"Other": other_count}),
+            ]
+        )
     else:
-        if num_categories == 1:
-            fig_width = 5
-            fig_height = 4
-            bar_width = 0.25
-        elif num_categories <= 3:
-            fig_width = 7
-            fig_height = 5
-            bar_width = 0.4
-        else:
-            fig_width = max(8, num_categories * 1.5)
-            fig_height = 5
-            bar_width = 0.7
+        offense_counts_plot = top_counts
 
-        fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    offense_counts_plot = offense_counts_plot.sort_values(ascending=True)
 
-        x_positions = list(range(num_categories))
-        ax.bar(x_positions, offense_counts.values, width=bar_width)
+    st.subheader("Offense Breakdown")
 
-        ax.set_title("Crime Types by Incident Offense")
-        ax.set_xlabel("Crime Type")
-        ax.set_ylabel("Occurrences")
+    num_categories = len(offense_counts_plot)
 
-        ax.set_xticks(x_positions)
-        ax.set_xticklabels(offense_counts.index, rotation=45, ha="right")
+    fig_height = max(5, num_categories * 0.45)
+    fig_width = 12
 
-        max_value = offense_counts.max()
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
 
-        if num_categories == 1:
-            ax.set_ylim(0, max(5, max_value * 5))
-            ax.set_xlim(-0.5, 0.5)
-        elif num_categories <= 3:
-            ax.set_ylim(0, max_value * 2)
-            ax.margins(x=0.2)
-        else:
-            ax.set_ylim(0, max_value * 1.25)
-            ax.margins(x=0.15)
+    ax.barh(
+        offense_counts_plot.index,
+        offense_counts_plot.values,
+    )
 
-        label_offset = max(max_value * 0.03, 0.1)
+    ax.set_title("Nearby Crime Records by Offense")
+    ax.set_xlabel("Nearby Records")
+    ax.set_ylabel("Offense")
 
-        for i, value in enumerate(offense_counts.values):
-            ax.text(
-                i,
-                value + label_offset,
-                str(value),
-                ha="center",
-                va="bottom"
-            )
+    max_value = offense_counts_plot.max()
 
-        plt.tight_layout()
+    if max_value == 1:
+        ax.set_xlim(0, 5)
+    else:
+        ax.set_xlim(0, max_value * 1.25)
+
+    label_offset = max(max_value * 0.02, 0.1)
+
+    for i, value in enumerate(offense_counts_plot.values):
+        ax.text(
+            value + label_offset,
+            i,
+            str(value),
+            va="center",
+        )
+
+    plt.tight_layout()
 
     st.pyplot(fig)
-
-    chart_df = offense_counts.reset_index()
-    chart_df.columns = ["Crime Type", "Count"]
-
-    st.subheader("Crime Type Breakdown")
-    st.dataframe(chart_df, use_container_width=True)

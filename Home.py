@@ -3,7 +3,8 @@ from streamlit_geolocation import streamlit_geolocation
 from dotenv import load_dotenv
 import os
 from map_controller import render_map
-from places_autocomplete import get_autocomplete, get_place_details
+from places_autocomplete import get_autocomplete, get_place_details, geocode_address
+from lapd_api import get_nearby_crime_markers
 
 #-----A inital setup for my streamlit env and pages-----------
 load_dotenv()
@@ -27,6 +28,50 @@ def is_valid_lat_lng(lat, lng):
         and -90 <= lat <= 90
         and -180 <= lng <= 180
     )
+
+def parse_lat_lng_string(value):
+    """
+    Converts '34.0689,-118.344' into (34.0689, -118.344).
+    Returns None if invalid.
+    """
+    if not isinstance(value, str):
+        return None
+
+    parts = value.split(",")
+
+    if len(parts) != 2:
+        return None
+
+    try:
+        lat = float(parts[0].strip())
+        lng = float(parts[1].strip())
+    except ValueError:
+        return None
+
+    if not is_valid_lat_lng(lat, lng):
+        return None
+
+    return lat, lng
+
+
+def set_crime_center(lat, lng, source, accuracy=None):
+    """
+    Stores the coordinate Python will use for the LAPD crime lookup.
+    """
+    if not is_valid_lat_lng(lat, lng):
+        st.session_state.crime_center = None
+        return False
+
+    st.session_state.crime_center = {
+        "lat": float(lat),
+        "lng": float(lng),
+        "source": source,
+        "accuracy": accuracy,
+    }
+
+    st.session_state.last_location = f"{lat},{lng}"
+    return True
+    
 #This section will help with my autofill section of code
 def sidebar_places_input(label: str, default_value: str, key_prefix: str, place_types: str | None = "geocode",):
     """
@@ -94,6 +139,11 @@ if "radius_miles" not in st.session_state:
 if "last_location" not in st.session_state:
     st.session_state.last_location = None
 
+if "crime_center" not in st.session_state:
+    st.session_state.crime_center = None
+if "crime_markers" not in st.session_state:
+    st.session_state.crime_markers = []
+
 TRAVEL_MODE_LABELS = ["Driving", "Walking", "Transit"]
 TRAVEL_MODE_MAP = {
     "Driving": "DRIVING",
@@ -122,6 +172,7 @@ radius_miles = st.sidebar.slider(
     step=1,
     key="radius_miles"
 )
+radius_meters = radius_miles * 1609.34
 
 travel_mode_label = st.sidebar.selectbox(
     "Travel Mode",
@@ -160,13 +211,22 @@ if use_current_location:
 
         if is_valid_lat_lng(lat, lng):
            detected_coords = f"{lat},{lng}"
-           st.session_state.last_location = detected_coords
+
+
+           set_crime_center(
+                lat=lat,
+                lng=lng,
+                source="current_location",
+                accuracy=accuracy,
+            )
+
+           
 
            if accuracy is not None and accuracy <= 100:
                st.session_state.start_address = detected_coords
                st.sidebar.success(
                    f"Current location detected ({accuracy:.0f} m accuracy)"
-            )
+                )
            elif accuracy is not None and accuracy <= 500:
                st.session_state.start_address = detected_coords
                st.sidebar.warning(
@@ -191,9 +251,40 @@ else:
     label="Enter starting point",
     default_value=st.session_state.start_address,
     key_prefix="start",
-    place_types="geocode",
+    place_types=None,
     )
     st.session_state.start_address = typed_start
+
+
+    start_coords = parse_lat_lng_string(start_address)
+
+    if start_coords:
+        center_lat, center_lng = start_coords
+
+        set_crime_center(
+            lat=center_lat,
+            lng=center_lng,
+            source="selected_start_place",
+        )
+    elif typed_start:
+        geocoded_coords = geocode_address(typed_start, api_key)
+
+        if geocoded_coords:
+            center_lat, center_lng = geocoded_coords
+
+            set_crime_center(
+                lat=center_lat,
+                lng=center_lng,
+                source="typed_start_geocoded",
+            )
+        else:
+            st.session_state.crime_center = None
+            st.sidebar.info(
+                "Select a suggested starting point to enable nearby crime lookup."
+            )
+
+    else:
+        st.session_state.crime_center = None
 
 # ---- Destination ----
 typed_dest, destination_address = sidebar_places_input(
@@ -204,10 +295,67 @@ typed_dest, destination_address = sidebar_places_input(
 )
 st.session_state.destination_address = typed_dest
 
+if st.sidebar.button("Load nearby crime records"):
+    if st.session_state.crime_center is None:
+        st.sidebar.error("No valid crime lookup center yet.")
+
+    elif radius_miles == 0:
+        st.sidebar.error("Increase radius before loading crime records.")
+
+    else:
+        center = st.session_state.crime_center
+
+        try:
+            crime_markers = get_nearby_crime_markers(
+                center_lat=center["lat"],
+                center_lng=center["lng"],
+                radius_meters=radius_meters,
+                max_records=500,
+            )
+
+            st.session_state.crime_markers = crime_markers
+
+            st.sidebar.success(
+                f"Loaded {len(crime_markers)} nearby crime record(s)."
+            )
+
+        except RuntimeError as error:
+            st.session_state.crime_markers = []
+            st.sidebar.error(str(error))
+
+
 st.sidebar.divider()
 
+#with st.sidebar.expander("Crime center debug"):
+#    st.write(st.session_state.crime_center)
+#
+#    st.write("Radius miles:", radius_miles)
+#    st.write("Radius meters:", radius_meters)
+#    st.write("Loaded crime markers:", len(st.session_state.crime_markers))
+#
+#    if st.session_state.crime_center is None:
+#        st.info("No valid Python-side coordinates yet.")
+#
+#    elif radius_miles == 0:
+#        st.info("Crime center is valid, but radius is 0.")
+#    else:
+#        center = st.session_state.crime_center
+#        st.success(
+#            f"Ready for crime lookup: {center['lat']}, {center['lng']} "
+#            f"within {radius_miles} mile(s)"
+#        )
+#
+
 st.title("SafeWay101 Map")
-render_map(api_key, start_address, destination_address, radius_miles, use_current_location, travel_mode)
+render_map(
+    api_key,
+    start_address,
+    destination_address,
+    radius_miles,
+    use_current_location,
+    travel_mode,
+    st.session_state.crime_markers,
+)
 # ----------------------Here ends my section for Maps Embed API------------------------------------
 
 
@@ -216,3 +364,5 @@ render_map(api_key, start_address, destination_address, radius_miles, use_curren
 
 
 #----------------------Here ends my section for places API --------------------------------------
+
+
